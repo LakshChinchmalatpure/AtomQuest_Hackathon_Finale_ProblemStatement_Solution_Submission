@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, useLocation } from "wouter";
-import { useJoinByToken } from "@workspace/api-client-react";
+import { useJoinByToken } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

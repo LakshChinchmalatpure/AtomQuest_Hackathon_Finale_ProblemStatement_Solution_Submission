@@ -1,5 +1,5 @@
 import { useParams, useLocation } from "wouter";
-import { useGetSession } from "@workspace/api-client-react";
+import { useGetSession } from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { CallRoom } from "@/components/CallRoom";
 

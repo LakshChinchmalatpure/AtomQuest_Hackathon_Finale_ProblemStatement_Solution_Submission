@@ -7,7 +7,7 @@ import {
   useEndSession,
   getListSessionsQueryKey,
   type Session,
-} from "@workspace/api-client-react";
+} from "@/lib/api-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";

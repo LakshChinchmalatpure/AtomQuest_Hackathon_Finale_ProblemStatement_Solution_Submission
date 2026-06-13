@@ -7,6 +7,7 @@ interface VideoTileProps {
   isMuted?: boolean;
   isVideoOff?: boolean;
   isMain?: boolean;
+  className?: string;
 }
 
 function Initials({ name }: { name: string }) {
@@ -21,7 +22,7 @@ function Initials({ name }: { name: string }) {
   );
 }
 
-export function VideoTile({ stream, name, isLocal, isMuted, isVideoOff, isMain }: VideoTileProps) {
+export function VideoTile({ stream, name, isLocal, isMuted, isVideoOff, isMain, className }: VideoTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -34,9 +35,7 @@ export function VideoTile({ stream, name, isLocal, isMuted, isVideoOff, isMain }
 
   return (
     <div
-      className={`relative rounded-xl overflow-hidden bg-zinc-900 border border-white/10 flex items-center justify-center ${
-        isMain ? "video-tile-active" : ""
-      }`}
+      className={`relative rounded-xl overflow-hidden bg-zinc-900 border border-white/10 flex items-center justify-center ${isMain ? "video-tile-active" : ""} ${className ?? ""}`}
     >
       {showVideo ? (
         <video

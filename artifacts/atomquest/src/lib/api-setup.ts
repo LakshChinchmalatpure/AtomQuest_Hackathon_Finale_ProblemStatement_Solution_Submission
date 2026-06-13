@@ -1,4 +1,4 @@
-import { setAuthTokenGetter } from "@workspace/api-client-react";
+import { setAuthTokenGetter } from "@/lib/api-client";
 
 export function setupApi() {
   setAuthTokenGetter(() => {

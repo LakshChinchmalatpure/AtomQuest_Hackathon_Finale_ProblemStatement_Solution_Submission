@@ -5,26 +5,16 @@ import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 
+// In Replit: PORT and BASE_PATH are required. Outside Replit: use defaults.
+const isReplit = Boolean(process.env.REPL_ID);
+
 const rawPort = process.env.PORT;
+const port = rawPort ? Number(rawPort) : 3000;
 
-if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
-}
+const basePath = process.env.BASE_PATH || "/";
 
-const port = Number(rawPort);
-
-if (Number.isNaN(port) || port <= 0) {
-  throw new Error(`Invalid PORT value: "${rawPort}"`);
-}
-
-const basePath = process.env.BASE_PATH;
-
-if (!basePath) {
-  throw new Error(
-    "BASE_PATH environment variable is required but was not provided.",
-  );
+if (isReplit && !rawPort) {
+  throw new Error("PORT environment variable is required but was not provided.");
 }
 
 export default defineConfig({
@@ -34,8 +24,7 @@ export default defineConfig({
     tailwindcss(),
     runtimeErrorOverlay(),
     nodePolyfills({ globals: { global: true, Buffer: true, process: true }, include: ["events", "util", "buffer", "stream", "path"] }),
-    ...(process.env.NODE_ENV !== "production" &&
-    process.env.REPL_ID !== undefined
+    ...(process.env.NODE_ENV !== "production" && isReplit
       ? [
           await import("@replit/vite-plugin-cartographer").then((m) =>
             m.cartographer({
@@ -68,6 +57,18 @@ export default defineConfig({
     strictPort: true,
     host: "0.0.0.0",
     allowedHosts: true,
+    // In standalone mode (non-Replit), proxy /api to the local server
+    ...(isReplit
+      ? {}
+      : {
+          proxy: {
+            "/api": {
+              target: `http://localhost:${process.env.SERVER_PORT || 5000}`,
+              changeOrigin: true,
+              ws: true,
+            },
+          },
+        }),
     fs: {
       strict: true,
     },

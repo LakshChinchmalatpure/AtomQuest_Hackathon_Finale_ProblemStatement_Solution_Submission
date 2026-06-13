@@ -45,8 +45,23 @@ export function CallRoom({
   const [connectionStatus, setConnectionStatus] = useState<"connecting" | "ready" | "error">("connecting");
   const [unreadCount, setUnreadCount] = useState(0);
 
+  // Recording state
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
   const localStreamRef = useRef<MediaStream | null>(null);
   const peersRef = useRef<Map<string, SimplePeer.Instance>>(new Map());
+  const participantsRef = useRef<Participant[]>([]);
+
+  // Keep participantsRef in sync
+  useEffect(() => {
+    participantsRef.current = participants;
+  }, [participants]);
 
   const createPeer = useCallback(
     (targetSocketId: string, initiator: boolean, stream: MediaStream): SimplePeer.Instance => {
@@ -176,6 +191,116 @@ export function CallRoom({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, userId, userName, userRole]);
 
+  // Cleanup recording on unmount
+  useEffect(() => {
+    return () => {
+      if (mediaRecorderRef.current?.state !== "inactive") {
+        mediaRecorderRef.current?.stop();
+      }
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      audioCtxRef.current?.close();
+      if (recordingUrl) URL.revokeObjectURL(recordingUrl);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const startRecording = () => {
+    const localStream = localStreamRef.current;
+    if (!localStream) {
+      toast({ title: "No local stream", description: "Camera must be active to start recording.", variant: "destructive" });
+      return;
+    }
+
+    try {
+      const audioCtx = new AudioContext();
+      audioCtxRef.current = audioCtx;
+      const dest = audioCtx.createMediaStreamDestination();
+
+      // Mix local audio
+      if (localStream.getAudioTracks().length > 0) {
+        const localSrc = audioCtx.createMediaStreamSource(localStream);
+        localSrc.connect(dest);
+      }
+
+      // Mix all remote audio tracks
+      participantsRef.current.forEach((p) => {
+        if (p.stream && p.stream.getAudioTracks().length > 0) {
+          const remoteSrc = audioCtx.createMediaStreamSource(p.stream);
+          remoteSrc.connect(dest);
+        }
+      });
+
+      // Compose: local video + mixed audio
+      const videoTracks = localStream.getVideoTracks();
+      const mixed = new MediaStream([...videoTracks, ...dest.stream.getAudioTracks()]);
+
+      const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
+        ? "video/webm;codecs=vp9,opus"
+        : "video/webm";
+
+      const recorder = new MediaRecorder(mixed, { mimeType });
+      recordingChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) recordingChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(recordingChunksRef.current, { type: "video/webm" });
+        const url = URL.createObjectURL(blob);
+        setRecordingUrl(url);
+        audioCtx.close();
+        audioCtxRef.current = null;
+        if (recordingTimerRef.current) {
+          clearInterval(recordingTimerRef.current);
+          recordingTimerRef.current = null;
+        }
+      };
+
+      recorder.start(1000);
+      mediaRecorderRef.current = recorder;
+      setIsRecording(true);
+      setRecordingSeconds(0);
+      setRecordingUrl(null);
+
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSeconds((s) => s + 1);
+      }, 1000);
+
+      toast({ title: "Recording started", description: "Call is now being recorded." });
+    } catch (err) {
+      console.error("Recording error:", err);
+      toast({ title: "Recording failed", description: "Could not start recording.", variant: "destructive" });
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current?.state !== "inactive") {
+      mediaRecorderRef.current?.stop();
+    }
+    setIsRecording(false);
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    toast({ title: "Recording stopped", description: "Your recording is ready to download." });
+  };
+
+  const downloadRecording = () => {
+    if (!recordingUrl) return;
+    const a = document.createElement("a");
+    a.href = recordingUrl;
+    const now = new Date().toISOString().replace(/[:.]/g, "-");
+    a.download = `atomquest-recording-${now}.webm`;
+    a.click();
+  };
+
+  const formatTime = (s: number) => {
+    const m = Math.floor(s / 60).toString().padStart(2, "0");
+    const sec = (s % 60).toString().padStart(2, "0");
+    return `${m}:${sec}`;
+  };
+
   const toggleMute = () => {
     const stream = localStreamRef.current;
     if (!stream) return;
@@ -252,6 +377,12 @@ export function CallRoom({
           >
             {connectionStatus === "ready" ? (hasRemote ? "Connected" : "Waiting...") : connectionStatus === "error" ? "Error" : "Connecting..."}
           </span>
+          {isRecording && (
+            <span className="flex items-center gap-1.5 text-xs text-red-400">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              REC {formatTime(recordingSeconds)}
+            </span>
+          )}
         </div>
         <span className="text-xs text-white/50">{userName}</span>
       </div>
@@ -311,6 +442,25 @@ export function CallRoom({
         </div>
       </div>
 
+      {/* Recording download banner */}
+      {recordingUrl && !isRecording && (
+        <div className="border-t border-white/10 bg-zinc-900 px-4 py-2 flex items-center gap-3">
+          <span className="text-sm text-white/70 flex-1">Recording ready ({formatTime(recordingSeconds)})</span>
+          <button
+            onClick={downloadRecording}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-medium transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Download (.webm)
+          </button>
+          <button onClick={() => setRecordingUrl(null)} className="text-white/40 hover:text-white/70 text-xs transition-colors">
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Controls bar */}
       <div className="border-t border-white/10 bg-black/40 px-4 py-3 flex items-center justify-center gap-3">
         <button
@@ -367,6 +517,27 @@ export function CallRoom({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
             </svg>
             <span className="text-xs">Invite</span>
+          </button>
+        )}
+
+        {/* Record button (agent only) */}
+        {isAgent && (
+          <button
+            onClick={isRecording ? stopRecording : startRecording}
+            className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg transition-colors ${
+              isRecording
+                ? "bg-red-600 text-white hover:bg-red-700"
+                : "bg-white/10 text-white hover:bg-white/20"
+            }`}
+          >
+            <svg className="w-4 h-4" fill={isRecording ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+              {isRecording ? (
+                <rect x="6" y="6" width="12" height="12" rx="1" />
+              ) : (
+                <circle cx="12" cy="12" r="7" strokeWidth={1.5} />
+              )}
+            </svg>
+            <span className="text-xs">{isRecording ? "Stop Rec" : "Record"}</span>
           </button>
         )}
 

@@ -1,4 +1,4 @@
-import { useAdminListSessions, useGetAdminStats, useAdminEndSession, getAdminListSessionsQueryKey, getGetAdminStatsQueryKey } from "@workspace/api-client-react";
+import { useAdminListSessions, useGetAdminStats, useAdminEndSession, getAdminListSessionsQueryKey, getGetAdminStatsQueryKey } from "@/lib/api-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -138,7 +138,7 @@ export default function AdminDashboard() {
                         <td className="px-4 py-3 text-muted-foreground">{s.agentName}</td>
                         <td className="px-4 py-3 text-muted-foreground">{s.customerName ?? "—"}</td>
                         <td className="px-4 py-3 text-muted-foreground">{s.messageCount}</td>
-                        <td className="px-4 py-3 text-muted-foreground font-mono text-xs">{formatDuration(s.durationSeconds)}</td>
+                        <td className="px-4 py-3 text-muted-foreground font-mono text-xs">{formatDuration(s.durationSeconds ?? null)}</td>
                         <td className="px-4 py-3 text-muted-foreground text-xs">{new Date(s.createdAt).toLocaleString()}</td>
                         <td className="px-4 py-3">
                           {s.status !== "ended" && (

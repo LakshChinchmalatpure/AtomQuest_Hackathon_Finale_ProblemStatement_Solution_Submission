@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useLocation } from "wouter";
-import { useGetSession } from "@workspace/api-client-react";
+import { useGetSession } from "@/lib/api-client";
 import { CallRoom } from "@/components/CallRoom";
 
 export default function CustomerCallRoom() {
