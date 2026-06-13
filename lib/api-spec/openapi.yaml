@@ -3,20 +3,25 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Atomquest Video Calling Platform API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication operations
+  - name: sessions
+    description: Video session operations
+  - name: admin
+    description: Admin dashboard operations
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +29,237 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login as agent or customer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user info
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sessions:
+    get:
+      operationId: listSessions
+      tags: [sessions]
+      summary: List all sessions (agent only)
+      responses:
+        "200":
+          description: List of sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Session"
+    post:
+      operationId: createSession
+      tags: [sessions]
+      summary: Create a new session (agent only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionInput"
+      responses:
+        "201":
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+
+  /sessions/{sessionId}:
+    get:
+      operationId: getSession
+      tags: [sessions]
+      summary: Get session details
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Session details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: endSession
+      tags: [sessions]
+      summary: End a session
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Session ended
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+
+  /sessions/{sessionId}/invite:
+    post:
+      operationId: generateInvite
+      tags: [sessions]
+      summary: Generate an invite link/token for a session
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Invite generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InviteResponse"
+
+  /sessions/{sessionId}/chat:
+    get:
+      operationId: getChatHistory
+      tags: [sessions]
+      summary: Get chat history for a session
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Chat messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatMessage"
+
+  /sessions/join/{token}:
+    get:
+      operationId: joinByToken
+      tags: [sessions]
+      summary: Get session info from invite token (customer join)
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Session info for joining
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "404":
+          description: Invalid token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/sessions:
+    get:
+      operationId: adminListSessions
+      tags: [admin]
+      summary: Admin - list all sessions with full details
+      responses:
+        "200":
+          description: All sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SessionDetail"
+
+  /admin/stats:
+    get:
+      operationId: getAdminStats
+      tags: [admin]
+      summary: Admin - get platform stats
+      responses:
+        "200":
+          description: Platform statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminStats"
+
+  /admin/sessions/{sessionId}/end:
+    post:
+      operationId: adminEndSession
+      tags: [admin]
+      summary: Admin - force end a session
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Session force-ended
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +270,182 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    LoginInput:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+      required:
+        - username
+        - password
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        role:
+          type: string
+          enum: [agent, customer, admin]
+        displayName:
+          type: string
+      required:
+        - id
+        - username
+        - role
+        - displayName
+
+    AuthResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        token:
+          type: string
+      required:
+        - user
+        - token
+
+    Session:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        status:
+          type: string
+          enum: [waiting, active, ended]
+        agentId:
+          type: integer
+        agentName:
+          type: string
+        customerName:
+          type: ["string", "null"]
+        inviteToken:
+          type: ["string", "null"]
+        startedAt:
+          type: ["string", "null"]
+        endedAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - title
+        - status
+        - agentId
+        - agentName
+        - createdAt
+
+    SessionInput:
+      type: object
+      properties:
+        title:
+          type: string
+      required:
+        - title
+
+    SessionDetail:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        status:
+          type: string
+          enum: [waiting, active, ended]
+        agentId:
+          type: integer
+        agentName:
+          type: string
+        customerName:
+          type: ["string", "null"]
+        startedAt:
+          type: ["string", "null"]
+        endedAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        messageCount:
+          type: integer
+        durationSeconds:
+          type: ["integer", "null"]
+      required:
+        - id
+        - title
+        - status
+        - agentId
+        - agentName
+        - createdAt
+        - messageCount
+
+    InviteResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        inviteUrl:
+          type: string
+      required:
+        - token
+        - inviteUrl
+
+    ChatMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+        sessionId:
+          type: string
+        senderId:
+          type: integer
+        senderName:
+          type: string
+        senderRole:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - sessionId
+        - senderId
+        - senderName
+        - senderRole
+        - content
+        - createdAt
+
+    AdminStats:
+      type: object
+      properties:
+        totalSessions:
+          type: integer
+        activeSessions:
+          type: integer
+        endedSessions:
+          type: integer
+        waitingSessions:
+          type: integer
+        totalMessages:
+          type: integer
+      required:
+        - totalSessions
+        - activeSessions
+        - endedSessions
+        - waitingSessions
+        - totalMessages

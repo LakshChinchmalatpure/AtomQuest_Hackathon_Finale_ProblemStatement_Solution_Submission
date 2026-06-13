@@ -1,0 +1,4 @@
+- [AtomQuest polyfills](atomquest-polyfills.md) — simple-peer + socket.io-client in Vite require vite-plugin-node-polyfills with events/util/buffer/stream modules included
+- [AtomQuest auth pattern](atomquest-auth.md) — JWT via hand-rolled HMAC-SHA256; setAuthTokenGetter reads from localStorage; Socket.IO at /api/socket.io path
+- [Express 5 params typing](express5-params.md) — req.params values are string | string[] in Express 5; always use String(req.params.foo) before passing to drizzle eq()
+- [DB lib stale declarations](db-lib-stale.md) — after editing lib/db schema, must run pnpm run typecheck:libs before artifact typechecks or exports appear missing
